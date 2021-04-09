@@ -5,8 +5,28 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
+/**
+ * The affiliate data source is currently a file, which may possibly
+ * be subject to change over time, so a decision was made to put this
+ * code in a model
+ */
 class Affiliate extends Model
 {
+    /**
+     * @var integer DEGREES
+     */
+    const DEGREES = 60;
+
+    /**
+     * @var float KMCONVERSION
+     */
+    const KMCONVERSION = 1.609344;
+
+    /**
+     * @var float STATUTEMILE
+     */
+    const STATUTEMILE = 1.1515;
+
     /**
      * @var float $dubLat
      */
@@ -47,18 +67,18 @@ class Affiliate extends Model
     private function calculateDistance($lat, $lng)
     {
         $theta = $this->dubLng - $lng;
-        $dist  = sin(deg2rad($this->dubLat)) * sin(deg2rad($lat)) +  cos(deg2rad($this->dubLat)) * cos(deg2rad($lat)) * cos(deg2rad($theta));
-        $dist  = acos($dist);
-        $dist  = rad2deg($dist);
-        $miles = $dist * 60 * 1.1515;
+        $x = deg2rad($this->dubLat);
+        $y = deg2rad($lat);
+        $dist  = rad2deg(acos(sin($x) * sin($y) +  cos($x) * cos($y) * cos(deg2rad($theta))));
+        $miles = $dist * self::DEGREES * self::STATUTEMILE;
 
-        return ($miles * 1.609344);
+        return ($miles * self::KMCONVERSION);
     }
     
     /**
      * It gets affiliates from a specific file
      *
-     * @return object
+     * @return array
      */
     public function getAffiliates()
     {
@@ -67,7 +87,7 @@ class Affiliate extends Model
         try {
             $handle = fopen($affiliatesFile, 'r');
         } catch (\Throwable $e) {
-            dd($e);
+            return ['status' => 'failed', 'data' => $e->getMessage()];
         }
 
         $structuredData = [];
@@ -78,19 +98,21 @@ class Affiliate extends Model
 
             $distance = $this->calculateDistance(floatval($decodedLine->latitude), floatval($decodedLine->longitude));
 
-            if ($distance <= $this->maxRangeDistance) {
-              $structuredData[$decodedLine->affiliate_id] = [
-                  'affiliate_id' => intval($decodedLine->affiliate_id),
-                  'distance'     => $distance,
-                  'latitude'     => floatval($decodedLine->latitude),
-                  'longitude'    => floatval($decodedLine->longitude),
-                  'name'         => $decodedLine->name
-              ];
+            if ($distance >= $this->maxRangeDistance) {
+                continue;
             }
+
+            $structuredData[$decodedLine->affiliate_id] = [
+                'affiliate_id' => intval($decodedLine->affiliate_id),
+                'distance'     => $distance,
+                'latitude'     => floatval($decodedLine->latitude),
+                'longitude'    => floatval($decodedLine->longitude),
+                'name'         => $decodedLine->name
+            ];
         }
         
         fclose($handle);
 
-        return $structuredData;
+        return ['status' => 'success', 'data' => $structuredData];
     }
 }
