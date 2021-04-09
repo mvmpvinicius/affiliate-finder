@@ -8,7 +8,7 @@
 4. Run "php artisan key:generate" in the console
 5. Run the project "php artisan serve" in the root directory to run locally your project or use docker/laradock to spin up the project containers.
 
-## FAQ
+## NOTES
 
 1. This project must be ran alongside with affiliate-finder-frontend.
 2. Certify each address modifying config files so frontend can comunicate with backend.
